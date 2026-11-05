@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #edf2f1; --surface: #fff; --ink: #0f2e2c; --muted: #53706d; --line: #d3dedc;
+      --accent: #0b6b5f; --soft: #dcebe8; --warn: #a85a00; --warn-bg: #fdecd2; --closed: #8a9c99;
+      --oil: #6b4f2a; --fin: #27467a; --pow: #0b6b5f; --cli: #5b3f8c;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: var(--bg); color: var(--ink); margin: 0; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 28px 16px 56px; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    h1 { margin: 0 0 4px; font-size: 30px; }
+    .sub { color: var(--muted); }
+
+    .btn { display: inline-block; padding: 9px 15px; background: var(--accent); color: #fff; text-decoration: none; border: 0; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    .btn.secondary { background: #e6eeed; color: var(--ink); }
+
+    /* ---------- deadline timeline ---------- */
+    .runway { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px 14px; margin: 24px 0; }
+    .runway h2 { margin: 0 0 2px; font-size: 18px; }
+    .runway p { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+    .track { position: relative; margin: 0 8px; }
+    .axis { position: absolute; left: 0; right: 0; bottom: 29px; height: 2px; background: var(--line); }
+    .tick { position: absolute; bottom: 2px; transform: translateX(-50%); font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .tick::before { content: ""; position: absolute; left: 50%; top: -9px; width: 1px; height: 8px; background: var(--closed); }
+    .tick.now { color: var(--ink); font-weight: bold; transform: none; }
+    .tick.now::before { left: 0; }
+    .pin { position: absolute; bottom: 24px; transform: translateX(-50%); border: 0; background: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+    .pin .lbl { font-size: 12px; font-weight: bold; background: var(--soft); padding: 2px 6px; border-radius: 4px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+    .pin .stem { width: 1px; background: var(--closed); }
+    .pin .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); }
+    .pin.soon .dot { background: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+    .pin.soon .lbl { background: var(--warn-bg); color: var(--warn); }
+    .pin:hover .lbl, .pin:focus-visible .lbl { background: var(--accent); color: #fff; }
+    .rollnote { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+
+    /* ---------- filters ---------- */
+    #q { width: 100%; padding: 12px 14px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .grp { font-size: 13px; color: var(--muted); min-width: 40px; }
+    .chip { font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 6px 13px; border-radius: 999px; cursor: pointer; }
+    .chip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .row2 { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: space-between; margin: 14px 0; font-size: 14px; color: var(--muted); }
+    .row2 label { display: flex; align-items: center; gap: 8px; }
+    select { font-size: 14px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+
+    /* ---------- list ---------- */
+    .job { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 10px; transition: background .3s; }
+    .job.flash { background: var(--soft); }
+    .job.closed { opacity: .55; }
+    .bar { width: 5px; border-radius: 3px; background: var(--cat); flex-shrink: 0; }
+    .job .main { flex: 1; min-width: 0; }
+    .job h3 { margin: 0; font-size: 18px; }
+    .role { margin: 2px 0 6px; font-weight: bold; }
+    .meta { color: var(--muted); font-size: 14px; }
+    .meta .focus { color: var(--cat); font-weight: bold; }
+    .side { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 150px; }
+    .due { font-weight: bold; font-size: 14px; }
+    .pill { font-size: 12px; font-weight: bold; padding: 2px 9px; border-radius: 999px; background: var(--soft); }
+    .pill.soon { background: var(--warn-bg); color: var(--warn); }
+    .pill.roll { background: none; border: 1px solid var(--line); color: var(--muted); }
+    details { margin-top: 8px; font-size: 14px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: bold; }
+    .notes { margin: 6px 0 0; max-width: 65ch; }
+    .error { color: #b00020; white-space: pre-wrap; }
+    .foot { margin-top: 24px; font-size: 13px; color: var(--muted); }
+
+    @media (max-width: 640px) {
+      .job { flex-wrap: wrap; }
+      .side { width: 100%; text-align: left; flex-direction: row; flex-wrap: wrap; align-items: center; }
+    }
+
+    /* ---------- modal form ---------- */
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); overflow-y: auto; padding: 20px 12px; z-index: 10; }
+    #modal { background: #fff; max-width: 560px; margin: 0 auto; padding: 22px; border-radius: 10px; }
+    #modal h2 { margin-top: 0; }
+    label.f { display: block; font-weight: bold; font-size: 14px; margin: 12px 0 4px; }
+    #modal input[type=text], #modal input[type=email], #modal input[type=url], #modal textarea {
+      width: 100%; padding: 9px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; font-family: inherit; }
+    .tags label { display: inline-block; margin: 4px 14px 4px 0; font-weight: normal; font-size: 14px; }
+    .hp { position: absolute; left: -9999px; }
+    #msg { margin-top: 12px; font-size: 14px; }
+    #msg.err { color: #b00020; }
+    #msg.ok { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>Energy & Climate Opportunities</h1>
+      <div class="sub">MIT Sloan Energy & Climate Club</div>
+    </div>
+    <button class="btn" onclick="openForm()">Add an opportunity</button>
+  </div>
+
+  <div class="runway">
+    <h2>Upcoming deadlines</h2>
+    <p>The next 10 weeks. Select a pin to jump to that posting.</p>
+    <div class="track" id="track"></div>
+    <p class="rollnote" id="rollnote"></p>
+  </div>
+
+  <input id="q" type="search" placeholder="Search company, role, location or notes" aria-label="Search opportunities">
+  <div class="chips" id="focusChips" role="group" aria-label="Focus area"></div>
+  <div class="chips" id="typeChips" role="group" aria-label="Type"></div>
+
+  <div class="row2">
+    <label><input type="checkbox" id="showClosed"> Show closed postings</label>
+    <label>Sort by
+      <select id="sort">
+        <option value="deadline">Closest deadline</option>
+        <option value="added">Recently added</option>
+        <option value="company">Company A–Z</option>
+      </select>
+    </label>
+    <span id="count" aria-live="polite"></span>
+  </div>
+
+  <div id="list">Loading…</div>
+
+  <div class="foot">Confirm deadlines and time zones on the original posting before you apply. Links on cdo-mit.12twenty.com need an MIT login.</div>
+</div>
+
+<!-- ---------- submission form ---------- -->
+<div id="overlay" onclick="if(event.target===this) closeForm()">
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
+    <h2 id="mt">Suggest an opportunity</h2>
+    <p style="margin-top:0;color:#555;font-size:14px">This goes by email to the SECC team. We'll review it and add it to the board.</p>
+    <form id="form" onsubmit="send(event)">
+      <label class="f" for="role">Role name *</label>
+      <input type="text" id="role" required>
+
+      <label class="f" for="company">Company name *</label>
+      <input type="text" id="company" required>
+
+      <label class="f">Type of opportunity</label>
+      <div class="tags" id="types">
+        <label><input type="checkbox" value="Internship"> Internship</label>
+        <label><input type="checkbox" value="Fellowship"> Fellowship</label>
+        <label><input type="checkbox" value="Full-time"> Full-time</label>
+        <label><input type="checkbox" value="Event / Competition"> Event / Competition</label>
+        <label><input type="checkbox" value="Other"> Other</label>
+      </div>
+
+      <label class="f">Focus area</label>
+      <div class="tags" id="focus">
+        <label><input type="checkbox" value="Oil & gas"> Oil & gas</label>
+        <label><input type="checkbox" value="Finance & investing"> Finance & investing</label>
+        <label><input type="checkbox" value="Power & clean energy"> Power & clean energy</label>
+        <label><input type="checkbox" value="Climate & sustainability"> Climate & sustainability</label>
+      </div>
+
+      <label class="f" for="location">Location</label>
+      <input type="text" id="location" placeholder="e.g. Houston, TX or Remote">
+
+      <label class="f" for="deadline">Deadline</label>
+      <input type="text" id="deadline" placeholder="e.g. Dec 1, 2026 or Rolling">
+
+      <label class="f" for="link">Link to posting *</label>
+      <input type="url" id="link" required placeholder="https://…">
+
+      <label class="f" for="description">Description *</label>
+      <textarea id="description" rows="4" required placeholder="What is the role? Who is it open to? Any contacts or notes?"></textarea>
+
+      <label class="f" for="name">Your name</label>
+      <input type="text" id="name">
+
+      <label class="f" for="email">Your email (so we can follow up)</label>
+      <input type="email" id="email">
+
+      <input class="hp" type="text" id="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+      <div style="margin-top:16px">
+        <button class="btn" type="submit" id="submitBtn">Send</button>
+        <button class="btn secondary" type="button" onclick="closeForm()">Cancel</button>
+      </div>
+      <div id="msg" role="status"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var DAY = 86400000;
+  var RAW = [], ALL = [], focusSel = 'All', typeSel = 'All';
+  var CAT_COLOR = {
+    'Oil & gas': 'var(--oil)', 'Finance & investing': 'var(--fin)',
+    'Power & clean energy': 'var(--pow)', 'Climate & sustainability': 'var(--cli)'
+  };
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function showError(t) { $('list').innerHTML = '<div class="error">' + esc(t) + '</div>'; }
+  window.onerror = function (m) { showError('Page error: ' + m); };
+
+  var timer = setTimeout(function () {
+    if ($('list').textContent === 'Loading…') {
+      showError('No response from the sheet after 20 seconds.\nCheck that the script is authorized and redeployed as a New version.');
+    }
+  }, 20000);
+
+  google.script.run
+    .withSuccessHandler(function (data) { clearTimeout(timer); RAW = data || []; ALL = normalize(RAW); render(); })
+    .withFailureHandler(function (err) { clearTimeout(timer); showError('Could not load the sheet: ' + err.message); })
+    .getOpportunities();
+
+  /* ---------- data prep ---------- */
+  function category(focus) {
+    if (/\boil\b|\bgas\b|petroleum/i.test(focus)) return 'Oil & gas';
+    if (/\bPE\b|private equity|banking|invest|infrastructure|venture|capital/i.test(focus)) return 'Finance & investing';
+    if (/utilit|renewable|clean energy|solar|wind|storage|grid|power/i.test(focus)) return 'Power & clean energy';
+    return 'Climate & sustainability';
+  }
+
+  function normalize(rows) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    return rows.map(function (r, i) {
+      var raw = (r['Deadline'] || '').trim(), due = null, rolling = false;
+      if (!raw || /rolling|open|tbd/i.test(raw)) rolling = true;
+      else {
+        var d = new Date(raw);
+        if (isNaN(d)) rolling = true; else { d.setHours(23, 59, 59, 0); due = d; }
+      }
+      var added = new Date(r['Date added']);
+      return {
+        id: 'opp' + i, row: r, due: due, rolling: rolling,
+        days: due ? Math.ceil((due - today) / DAY) : null,
+        closed: due ? due < new Date() : false,
+        added: isNaN(added) ? null : added,
+        cat: category(r['Focus area'] || ''),
+        type: (r['Type'] || 'Other').trim() || 'Other'
+      };
+    });
+  }
+
+  function fmtDate(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+  function dueInfo(o) {
+    if (o.rolling) return { main: 'Rolling deadline', pill: 'Apply anytime', cls: 'roll' };
+    if (o.closed) return { main: 'Closed ' + fmtDate(o.due), pill: 'Closed', cls: '' };
+    var rel = o.days <= 0 ? 'Closes today' : o.days === 1 ? 'Closes tomorrow' : 'Closes in ' + o.days + ' days';
+    return { main: fmtDate(o.due), pill: rel, cls: o.days <= 14 ? 'soon' : '' };
+  }
+
+  /* ---------- filters ---------- */
+  function chipGroup(el, label, values, current, onPick) {
+    el.innerHTML = '<span class="grp">' + label + '</span>' +
+      ['All'].concat(values).map(function (v) {
+        return '<button type="button" class="chip" aria-pressed="' + (v === current) + '" data-v="' + esc(v) + '">' + esc(v) + '</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.addEventListener('click', function () { onPick(b.getAttribute('data-v')); });
+    });
+  }
+
+  function filtered() {
+    var q = $('q').value.trim().toLowerCase();
+    var showClosed = $('showClosed').checked, sort = $('sort').value;
+    var r = ALL.filter(function (o) {
+      return (showClosed || !o.closed) &&
+        (focusSel === 'All' || o.cat === focusSel) &&
+        (typeSel === 'All' || o.type === typeSel) &&
+        (!q || Object.keys(o.row).map(function (k) { return o.row[k]; }).join(' ').toLowerCase().indexOf(q) > -1);
+    });
+    function dl(o) { return o.closed ? 1e13 : o.due ? o.due.getTime() : 5e12; }
+    function name(o) { return (o.row['Company'] || ''); }
+    if (sort === 'deadline') r.sort(function (a, b) { return dl(a) - dl(b) || name(a).localeCompare(name(b)); });
+    if (sort === 'added') r.sort(function (a, b) { return ((b.added ? b.added.getTime() : 0) - (a.added ? a.added.getTime() : 0)) || dl(a) - dl(b); });
+    if (sort === 'company') r.sort(function (a, b) { return name(a).localeCompare(name(b)); });
+    return r;
+  }
+
+  /* ---------- render list ---------- */
+  function render() {
+    var cats = ALL.map(function (o) { return o.cat; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort();
+    var types = ALL.map(function (o) { return o.type; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort();
+    chipGroup($('focusChips'), 'Focus', cats, focusSel, function (v) { focusSel = v; render(); });
+    chipGroup($('typeChips'), 'Type', types, typeSel, function (v) { typeSel = v; render(); });
+
+    var rows = filtered();
+    $('count').textContent = rows.length + ' of ' + ALL.length + ' shown';
+
+    $('list').innerHTML = rows.length ? rows.map(function (o) {
+      var j = o.row, d = dueInfo(o);
+      var login = /12twenty/.test(j['Link'] || '') ? ' (MIT login)' : '';
+      var notes = j['Notes'] ? '<details><summary>Notes</summary><p class="notes">' + esc(j['Notes']) + '</p></details>' : '';
+      return '<div class="job ' + (o.closed ? 'closed' : '') + '" id="' + o.id + '" style="--cat:' + CAT_COLOR[o.cat] + '">' +
+        '<span class="bar" aria-hidden="true"></span>' +
+        '<div class="main">' +
+          '<h3>' + esc(j['Company']) + '</h3>' +
+          '<div class="role">' + esc(j['Role']) + '</div>' +
+          '<div class="meta"><span class="focus">' + esc(o.cat) + '</span> · ' + esc(o.type) + ' · ' + esc(j['Location']) + '</div>' +
+          notes +
+        '</div>' +
+        '<div class="side">' +
+          '<span class="due">' + esc(d.main) + '</span>' +
+          '<span class="pill ' + d.cls + '">' + esc(d.pill) + '</span>' +
+          (j['Link'] ? '<a class="btn" href="' + esc(j['Link']) + '" target="_blank">View posting' + login + '</a>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('') : '<div class="sub" style="padding:24px 0">No postings match these filters. Clear the search or choose “All” to see everything.</div>';
+
+    renderRunway();
+  }
+
+  /* ---------- deadline timeline ---------- */
+  function renderRunway() {
+    var SPAN = 70, track = $('track');
+    var live = ALL.filter(function (o) { return o.due && !o.closed && o.days <= SPAN; })
+                  .sort(function (a, b) { return a.days - b.days; });
+    var W = track.clientWidth || 600;
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+
+    // put each label on the first level where it doesn't overlap another
+    var laneEnds = [], placed = live.map(function (o) {
+      var x = Math.max(o.days, 0) / SPAN * W;
+      var w = Math.min(120, (o.row['Company'] || '').length * 6.6 + 14);
+      var lane = 0;
+      while (laneEnds[lane] !== undefined && laneEnds[lane] > x - w / 2) lane++;
+      laneEnds[lane] = x + w / 2 + 6;
+      return { o: o, lane: lane };
+    });
+    var maxLane = placed.reduce(function (m, p) { return Math.max(m, p.lane); }, 0);
+    track.style.height = (60 + (maxLane + 1) * 26) + 'px';
+
+    var h = '<div class="axis"></div><div class="tick now" style="left:0">Today</div>';
+    for (var m = 1; m <= 3; m++) {
+      var d = new Date(today.getFullYear(), today.getMonth() + m, 1);
+      var off = Math.round((d - today) / DAY);
+      if (off < SPAN - 4) h += '<div class="tick" style="left:' + (off / SPAN * 100) + '%">' +
+        d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</div>';
+    }
+    placed.forEach(function (p) {
+      var o = p.o, left = Math.max(o.days, 0) / SPAN * 100;
+      h += '<button class="pin ' + (o.days <= 14 ? 'soon' : '') + '" data-id="' + o.id + '" style="left:' + left + '%" ' +
+        'title="' + esc(o.row['Company']) + ' · ' + fmtDate(o.due) + '" aria-label="' + esc(o.row['Company']) + ', closes ' + fmtDate(o.due) + '">' +
+        '<span class="lbl">' + esc(o.row['Company']) + '</span>' +
+        '<span class="stem" style="height:' + (p.lane * 26 + 6) + 'px"></span>' +
+        '<span class="dot"></span></button>';
+    });
+    track.innerHTML = live.length ? h : '<p class="rollnote" style="padding:16px 0">No dated deadlines in the next 10 weeks.</p>';
+
+    Array.prototype.forEach.call(track.querySelectorAll('.pin'), function (p) {
+      p.addEventListener('click', function () {
+        var id = p.getAttribute('data-id');
+        if (!$(id)) { focusSel = 'All'; typeSel = 'All'; $('q').value = ''; $('showClosed').checked = false; render(); }
+        var t = $(id); if (!t) return;
+        t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        t.classList.add('flash'); setTimeout(function () { t.classList.remove('flash'); }, 1600);
+        var det = t.querySelector('details'); if (det) det.open = true;
+      });
+    });
+
+    var rolling = ALL.filter(function (o) { return o.rolling && !o.closed; }).length;
+    $('rollnote').textContent = rolling + ' more ' + (rolling === 1 ? 'posting has a rolling deadline and doesn’t' : 'postings have rolling deadlines and don’t') + ' appear on the line.';
+  }
+
+  $('q').addEventListener('input', render);
+  $('showClosed').addEventListener('change', render);
+  $('sort').addEventListener('change', render);
+  var rz; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { if (ALL.length) renderRunway(); }, 150); });
+
+  /* ---------- submission form ---------- */
+  function checked(id) {
+    return Array.prototype.map.call(document.querySelectorAll('#' + id + ' input:checked'), function (c) { return c.value; }).join(', ');
+  }
+  function openForm() { $('overlay').style.display = 'block'; $('msg').textContent = ''; $('role').focus(); }
+  function closeForm() { $('overlay').style.display = 'none'; }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeForm(); });
+
+  function send(e) {
+    e.preventDefault();
+    var btn = $('submitBtn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    $('msg').className = ''; $('msg').textContent = '';
+    var payload = {
+      role: $('role').value, company: $('company').value,
+      types: checked('types'), focus: checked('focus'),
+      location: $('location').value, deadline: $('deadline').value,
+      link: $('link').value, description: $('description').value,
+      name: $('name').value, email: $('email').value, website: $('website').value
+    };
+    google.script.run
+      .withSuccessHandler(function () {
+        $('form').reset(); btn.disabled = false; btn.textContent = 'Send';
+        $('msg').className = 'ok'; $('msg').textContent = 'Thanks! Your suggestion was sent to the SECC team.';
+        setTimeout(closeForm, 2500);
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false; btn.textContent = 'Send';
+        $('msg').className = 'err'; $('msg').textContent = err.message.replace(/^Error:\s*/, '');
+      })
+      .submitOpportunity(payload);
+  }
+</script>
+</body>
+</html>
